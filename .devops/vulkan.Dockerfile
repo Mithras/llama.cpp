@@ -3,7 +3,8 @@ ARG UBUNTU_VERSION=26.04
 FROM ubuntu:$UBUNTU_VERSION AS build
 
 # Install build tools
-RUN apt update && apt install -y git build-essential cmake wget xz-utils
+RUN apt update && apt install -y git build-essential cmake wget xz-utils \
+    libibverbs-dev rdma-core
 
 # Install SSL and Vulkan SDK dependencies
 RUN apt install -y libssl-dev curl \
@@ -14,7 +15,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN cmake -B build -DGGML_NATIVE=OFF -DGGML_VULKAN=ON -DLLAMA_BUILD_TESTS=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON && \
+RUN cmake -B build -DGGML_RPC=ON -DGGML_RPC_RDMA=ON -DGGML_NATIVE=OFF -DGGML_VULKAN=ON -DLLAMA_BUILD_TESTS=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON && \
     cmake --build build --config Release -j$(nproc)
 
 RUN mkdir -p /app/lib && \
@@ -34,6 +35,7 @@ FROM ubuntu:$UBUNTU_VERSION AS base
 RUN apt-get update \
     && apt-get install -y libgomp1 curl libvulkan1 mesa-vulkan-drivers \
     libglvnd0 libgl1 libglx0 libegl1 libgles2 \
+    libibverbs-dev rdma-core ibverbs-utils \
     && apt autoremove -y \
     && apt clean -y \
     && rm -rf /tmp/* /var/tmp/* \
@@ -86,6 +88,7 @@ FROM base AS server
 ENV LLAMA_ARG_HOST=0.0.0.0
 
 COPY --from=build /app/full/llama-server /app
+COPY --from=build /app/full/rpc-server /app
 
 WORKDIR /app
 

@@ -28,7 +28,8 @@ RUN apt-get update \
     git \
     libssl-dev \
     curl \
-    libgomp1
+    libgomp1 \
+    libibverbs-dev rdma-core
 
 WORKDIR /app
 
@@ -36,6 +37,7 @@ COPY . .
 
 RUN HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
     cmake -S . -B build \
+        -DGGML_RPC=ON -DGGML_RPC_RDMA=ON \
         -DGGML_HIP=ON \
         -DGGML_HIP_ROCWMMA_FATTN=ON \
         -DAMDGPU_TARGETS="$ROCM_DOCKER_ARCH" \
@@ -59,6 +61,7 @@ FROM ${BASE_ROCM_DEV_CONTAINER} AS base
 
 RUN apt-get update \
     && apt-get install -y libgomp1 curl \
+    libibverbs-dev rdma-core ibverbs-utils \
     && apt autoremove -y \
     && apt clean -y \
     && rm -rf /tmp/* /var/tmp/* \
@@ -105,6 +108,7 @@ FROM base AS server
 ENV LLAMA_ARG_HOST=0.0.0.0
 
 COPY --from=build /app/full/llama-server /app
+COPY --from=build /app/full/rpc-server /app
 
 WORKDIR /app
 
